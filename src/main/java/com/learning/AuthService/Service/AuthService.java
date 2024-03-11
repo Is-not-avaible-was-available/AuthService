@@ -1,5 +1,6 @@
 package com.learning.AuthService.Service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.learning.AuthService.DTOs.UserDetailsResponseDTO;
 import com.learning.AuthService.Exceptions.AlreadyExistsException;
 import com.learning.AuthService.Exceptions.InvalidCredentialsException;
@@ -12,6 +13,10 @@ import com.learning.AuthService.Models.User;
 import com.learning.AuthService.Repositories.RoleRepository;
 import com.learning.AuthService.Repositories.SessionRepository;
 import com.learning.AuthService.Repositories.UserRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.Jwts;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,10 +25,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.MultiValueMapAdapter;
+
+import javax.crypto.SecretKey;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class AuthService {
@@ -32,15 +37,19 @@ public class AuthService {
     private final SessionRepository sessionRepository;
     private final UserMapper userMapper;
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
-
+    private final SecretKey secretKey;
+    private final ObjectMapper objectMapper;
     public AuthService(UserRepository userRepository, RoleRepository roleRepository,
                        SessionRepository sessionRepository, UserMapper userMapper,
-                       BCryptPasswordEncoder bCryptPasswordEncoder) {
+                       BCryptPasswordEncoder bCryptPasswordEncoder,
+                        ObjectMapper objectMapper) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.sessionRepository = sessionRepository;
         this.userMapper = userMapper;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
+        this.secretKey = Jwts.SIG.HS256.key().build();
+        this.objectMapper = objectMapper;
     }
 
     public String createNewUser(String email, String name, String password, String roleId) throws NotFoundException, AlreadyExistsException {
@@ -52,7 +61,7 @@ public class AuthService {
             user.setName(name);
             user.setEmail(email);
             user.setPassword(bCryptPasswordEncoder.encode(password));
-            Optional<Role> roleOptional = roleRepository.findById(UUID.fromString(roleId));
+            Optional<Role> roleOptional = roleRepository.findById(Long.valueOf(roleId));
             if(roleOptional.isEmpty()){
                 throw new NotFoundException("Role not found!");
             }
@@ -72,7 +81,17 @@ public class AuthService {
         if(!bCryptPasswordEncoder.matches(password, user.getPassword())){
             throw new InvalidCredentialsException("Invalid Credentials!");
         }
-        String token = RandomStringUtils.randomAlphanumeric(30);
+//        String token = RandomStringUtils.randomAlphanumeric(30);
+        Map<String, Object> jwtContent = new HashMap<>();
+        jwtContent.put("email", user.getEmail());
+        jwtContent.put("role", user.getRole());
+
+        String token = Jwts
+                .builder().issuedAt(new Date())
+                .claims(jwtContent)
+                .signWith(secretKey)
+                .compact();
+
         Session session = new Session();
         session.setToken(token);
         session.setUser(user);
@@ -87,7 +106,7 @@ public class AuthService {
 
     public SessionStatus validateSession(String token, String userId) {
         Optional<Session> sessionOptional = sessionRepository.findSessionByTokenAndUser_Id(token,
-                UUID.fromString(userId));
+                Long.valueOf(userId));
         if(sessionOptional.isEmpty()){
             return SessionStatus.ENDED;
         }
@@ -95,12 +114,18 @@ public class AuthService {
         if(session.getSessionStatus().equals(SessionStatus.ENDED)){
             return SessionStatus.ENDED;
         }
+
+        Jws<Claims> claimsJws = Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
+        String email = (String) claimsJws.getPayload().get("email");
+        Date expiryDate = (Date) claimsJws.getPayload().getExpiration();
+        Date issueDate = claimsJws.getPayload().getIssuedAt();
+//        Role role = (Role) claimsJws.getPayload().get("role");
         return SessionStatus.ACTIVE;
     }
 
     public String logout(String token, String id){
         Optional<Session> sessionOptional = sessionRepository.findSessionByTokenAndUser_Id(token,
-                UUID.fromString(id));
+                Long.valueOf(id));
         if(sessionOptional.isEmpty()){
             return "";
         }

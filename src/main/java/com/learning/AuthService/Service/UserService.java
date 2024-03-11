@@ -27,7 +27,7 @@ public class UserService {
         this.userMapper = userMapper;
     }
     public UserDetailsResponseDTO getUserDetails(String id) throws NotFoundException {
-       Optional<User> optionalUser = userRepository.findById(UUID.fromString(id));
+       Optional<User> optionalUser = userRepository.findById(Long.valueOf(id));
        if(optionalUser.isEmpty()){
            throw new NotFoundException("User not found"+id);
        }
@@ -36,12 +36,12 @@ public class UserService {
     }
 
     public UserDetailsResponseDTO setUserWithRoles(String id, SetRolesRequestDTO requestDTO) throws NotFoundException {
-        Optional<User> optionalUser = userRepository.findById(UUID.fromString(id));
+        Optional<User> optionalUser = userRepository.findById(Long.valueOf(id));
         if(optionalUser.isEmpty()){
             throw new NotFoundException("User not found!");
         }
         User user = optionalUser.get();
-        Optional<Role> roleOptional = roleRepository.findById(UUID.fromString(requestDTO.getRoleId()));
+        Optional<Role> roleOptional = roleRepository.findById(Long.valueOf(requestDTO.getRoleId()));
         if(roleOptional.isEmpty()){
             throw new NotFoundException("Role not found!");
         }

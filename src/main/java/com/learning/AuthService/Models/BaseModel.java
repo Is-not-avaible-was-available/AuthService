@@ -17,10 +17,8 @@ import java.util.UUID;
 @MappedSuperclass
 public class BaseModel {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID, generator = "uuid-generator")
-    @GenericGenerator(name = "uuid-generator", strategy = "uuid2")
-    @NonNull
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     private Date createdAt;
     private Date lastModifiedAt;
 }

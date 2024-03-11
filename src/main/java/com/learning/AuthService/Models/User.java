@@ -1,5 +1,6 @@
 package com.learning.AuthService.Models;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NonNull;
@@ -9,6 +10,7 @@ import java.util.Set;
 @Getter
 @Setter
 @Entity
+@JsonDeserialize(as = User.class)
 public class User extends BaseModel{
     @NonNull
    private String name;
